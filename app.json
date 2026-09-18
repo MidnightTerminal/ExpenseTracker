@@ -1,25 +1,51 @@
 {
   "expo": {
     "name": "ExpenseTracker",
-    "slug": "ExpenseTracker",
+    "slug": "expense-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6C63FF"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.expensetracker",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to securely access your expenses"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6C63FF"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.yourname.expensetracker",
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow ExpenseTracker to use Face ID for authentication"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9c4e6c7b-f188-4bb3-96ae-8adfd93f701d"
+      }
     }
   }
 }
