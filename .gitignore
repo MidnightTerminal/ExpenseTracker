@@ -50,6 +50,7 @@ ios/*.xcodeproj/xcuserdata/
 .env
 .env.local
 .env.*.local
+server/.env
 *.pem
 *.keystore
 google-services.json

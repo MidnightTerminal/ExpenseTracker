@@ -6,6 +6,7 @@ const KEYS = {
   BUDGET: '@budget',
   SETTINGS: '@settings',
   PIN: '@pin_hash',
+  ACCOUNT: '@account',
 };
 
 export const storage = {

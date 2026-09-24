@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { storage } from '../utils/storage';
 import { security } from '../utils/security';
+import { Account, cloudApi } from '../utils/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -12,6 +13,11 @@ interface AuthContextType {
   verifyPin: (pin: string) => Promise<boolean>;
   enableLock: (enabled: boolean) => Promise<void>;
   logout: () => void;
+  account: Account | null;
+  cloudConfigured: boolean;
+  register: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  cloudLogout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -21,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLockEnabled, setIsLockEnabled] = useState(false);
   const [isPinSet, setIsPinSet] = useState(false);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
+  const [account, setAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     initAuth();
@@ -32,6 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const settings = await storage.load(storage.keys.SETTINGS);
     const pin = await storage.load(storage.keys.PIN);
+    const savedAccount = await storage.load(storage.keys.ACCOUNT);
+    if (savedAccount) setAccount(savedAccount);
 
     if (pin) setIsPinSet(true);
     if (settings?.biometricEnabled || pin) {
@@ -86,11 +95,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const register = async (email: string, password: string) => {
+    const savedAccount = await cloudApi.register(email, password);
+    setAccount(savedAccount);
+    await storage.save(storage.keys.ACCOUNT, savedAccount);
+  };
+
+  const login = async (email: string, password: string) => {
+    const savedAccount = await cloudApi.login(email, password);
+    setAccount(savedAccount);
+    await storage.save(storage.keys.ACCOUNT, savedAccount);
+  };
+
+  const cloudLogout = async () => {
+    await cloudApi.logout();
+    setAccount(null);
+    await storage.remove(storage.keys.ACCOUNT);
+  };
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated, isLockEnabled, isPinSet, isBiometricAvailable,
         authenticate, setPin, verifyPin, enableLock, logout,
+        account, cloudConfigured: cloudApi.isConfigured, register, login, cloudLogout,
       }}
     >
       {children}

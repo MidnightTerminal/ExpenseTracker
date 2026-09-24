@@ -22,6 +22,18 @@ export const ReportsScreen: React.FC = () => {
   const categoryTotals = getCategoryTotals(period);
   const totalSpent = categoryTotals.reduce((sum, c) => sum + c.total, 0);
 
+  const monthlyHistory = useMemo(() => {
+    const months: { [key: string]: { label: string; total: number; count: number } } = {};
+    expenses.forEach(expense => {
+      const date = new Date(expense.date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!months[key]) months[key] = { label: getMonthName(date), total: 0, count: 0 };
+      months[key].total += expense.amount;
+      months[key].count += 1;
+    });
+    return Object.entries(months).sort(([a], [b]) => b.localeCompare(a)).map(([, month]) => month);
+  }, [expenses]);
+
   const pieData = useMemo(() =>
     categoryTotals.slice(0, 8).map(cat => ({
       name: cat.name.length > 12 ? cat.name.substring(0, 12) + '...' : cat.name,
@@ -218,6 +230,24 @@ export const ReportsScreen: React.FC = () => {
           </View>
         </AnimatedCard>
 
+        <AnimatedCard index={6} style={styles.historyCard}>
+          <View style={styles.chartHeader}>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>Monthly History</Text>
+            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+          </View>
+          {monthlyHistory.length === 0 ? (
+            <Text style={[styles.emptyHistory, { color: colors.textTertiary }]}>No monthly history yet</Text>
+          ) : monthlyHistory.map(month => (
+            <View key={month.label} style={[styles.historyRow, { borderBottomColor: colors.border }]}>
+              <View style={styles.historyInfo}>
+                <Text style={[styles.historyMonth, { color: colors.text }]}>{month.label}</Text>
+                <Text style={[styles.historyCount, { color: colors.textTertiary }]}>{month.count} transaction{month.count !== 1 ? 's' : ''}</Text>
+              </View>
+              <Text style={[styles.historyTotal, { color: colors.text }]}>{formatCurrency(month.total, currencySymbol)}</Text>
+            </View>
+          ))}
+        </AnimatedCard>
+
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -265,4 +295,11 @@ const styles = StyleSheet.create({
   avgInfo: { flex: 1, marginLeft: 14 },
   avgLabel: { fontSize: 13 },
   avgValue: { fontSize: 22, fontWeight: '700', marginTop: 4 },
+  historyCard: { marginBottom: 16 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5 },
+  historyInfo: { flex: 1 },
+  historyMonth: { fontSize: 15, fontWeight: '600' },
+  historyCount: { fontSize: 12, marginTop: 3 },
+  historyTotal: { fontSize: 15, fontWeight: '700' },
+  emptyHistory: { paddingVertical: 16, textAlign: 'center' },
 });

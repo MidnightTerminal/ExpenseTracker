@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, Modal, TextInput,
+  View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -12,15 +12,26 @@ import { useCurrency } from '../context/CurrencyContext';
 import { storage } from '../utils/storage';
 import { AnimatedCard } from '../components/AnimatedCard';
 import { CURRENCY_OPTIONS } from '../utils/constants';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { formatCurrency } from '../utils/helpers';
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors, isDark, toggleTheme } = useTheme();
-  const { isLockEnabled, enableLock, isPinSet, setPin, isBiometricAvailable, logout } = useAuth();
+  const {
+    isLockEnabled, enableLock, isPinSet, setPin, isBiometricAvailable, logout,
+    account, cloudConfigured, register, login, cloudLogout,
+  } = useAuth();
   const { expenses } = useExpenses();
   const { currency: selectedCurrency, setCurrency } = useCurrency();
   const [showPinModal, setShowPinModal] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountMode, setAccountMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [accountBusy, setAccountBusy] = useState(false);
 
   const handleToggleLock = async (enabled: boolean) => {
     if (enabled && !isPinSet) {
@@ -42,9 +53,44 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleExportData = () => {
-    const data = JSON.stringify(expenses, null, 2);
-    Alert.alert('Export Data', `You have ${expenses.length} transactions.\n\nData export feature coming soon!`);
+  const handleExportData = async () => {
+    const directory = FileSystem.cacheDirectory;
+    if (!directory) {
+      Alert.alert('Export failed', 'File storage is not available on this device.');
+      return;
+    }
+
+    const report = [
+      'EXPENSE TRACKER EXPORT',
+      `Generated: ${new Date().toLocaleString()}`,
+      `Transactions: ${expenses.length}`,
+      '',
+      ...expenses.map((expense, index) => [
+        `${index + 1}. ${expense.category}`,
+        `Amount: ${formatCurrency(expense.amount, selectedCurrency.symbol)}`,
+        `Date: ${new Date(expense.date).toLocaleDateString()}`,
+        `Note: ${expense.note || '-'}`,
+        '',
+      ].join('\n')),
+    ].join('\n');
+
+    try {
+      const fileUri = `${directory}expense-tracker-${Date.now()}.txt`;
+      await FileSystem.writeAsStringAsync(fileUri, report, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/plain',
+          dialogTitle: 'Export expense history',
+        });
+      } else {
+        Alert.alert('Export complete', 'The text file was created, but sharing is unavailable on this device.');
+      }
+    } catch (error) {
+      Alert.alert('Export failed', error instanceof Error ? error.message : 'Could not create the export file.');
+    }
   };
 
   const handleClearData = () => {
@@ -65,6 +111,25 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         },
       ]
     );
+  };
+
+  const handleAccountSubmit = async () => {
+    if (!email.trim() || password.length < 8) {
+      Alert.alert('Invalid account details', 'Enter an email and a password of at least 8 characters.');
+      return;
+    }
+    setAccountBusy(true);
+    try {
+      if (accountMode === 'login') await login(email.trim(), password);
+      else await register(email.trim(), password);
+      setShowAccountModal(false);
+      setPassword('');
+      Alert.alert('Cloud backup enabled', 'Your expense history is now linked to this account.');
+    } catch (error) {
+      Alert.alert('Account error', error instanceof Error ? error.message : 'Could not connect to the account.');
+    } finally {
+      setAccountBusy(false);
+    }
   };
 
   const SettingRow = ({
@@ -156,6 +221,21 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 <Ionicons name="checkmark-circle" size={22} color={colors.success} />
               }
             />
+          )}
+        </AnimatedCard>
+
+        {/* Data */}
+        <AnimatedCard index={2} style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>CLOUD BACKUP</Text>
+          {!cloudConfigured ? (
+            <SettingRow icon="cloud-offline" iconColor={colors.warning} title="Cloud backup unavailable" subtitle="Add your API URL to enable accounts" right={null} />
+          ) : account ? (
+            <>
+              <SettingRow icon="cloud-done" iconColor={colors.success} title="Signed in" subtitle={account.email} onPress={() => navigation.navigate('Profile')} />
+              <SettingRow icon="log-out-outline" iconColor={colors.error} title="Sign out" onPress={() => cloudLogout()} />
+            </>
+          ) : (
+            <SettingRow icon="cloud-upload" iconColor={colors.primary} title="Create account or sign in" subtitle="Keep monthly history after clearing app data" onPress={() => setShowAccountModal(true)} />
           )}
         </AnimatedCard>
 
@@ -275,6 +355,25 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </Animated.View>
         </View>
       </Modal>
+
+      <Modal visible={showAccountModal} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
+          <Animated.View entering={FadeInDown.springify()} style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{accountMode === 'login' ? 'Sign In' : 'Create Account'}</Text>
+              <Pressable onPress={() => setShowAccountModal(false)}><Ionicons name="close" size={24} color={colors.text} /></Pressable>
+            </View>
+            <TextInput style={[styles.accountInput, { backgroundColor: colors.inputBackground, color: colors.text }]} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textTertiary} autoCapitalize="none" keyboardType="email-address" />
+            <TextInput style={[styles.accountInput, { backgroundColor: colors.inputBackground, color: colors.text }]} value={password} onChangeText={setPassword} placeholder="Password (8+ characters)" placeholderTextColor={colors.textTertiary} secureTextEntry />
+            <Pressable style={[styles.accountSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleAccountSubmit} disabled={accountBusy}>
+              {accountBusy ? <ActivityIndicator color="#FFF" /> : <Text style={[styles.modalBtnText, { color: '#FFF' }]}>{accountMode === 'login' ? 'Sign In' : 'Create Account'}</Text>}
+            </Pressable>
+            <Pressable onPress={() => setAccountMode(accountMode === 'login' ? 'register' : 'login')}>
+              <Text style={[styles.accountSwitch, { color: colors.primary }]}>{accountMode === 'login' ? 'Need an account? Create one' : 'Already have an account? Sign in'}</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -310,4 +409,7 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 12, borderBottomWidth: 0.5, marginBottom: 4,
   },
   currencyText: { fontSize: 16, fontWeight: '500' },
+  accountInput: { borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12 },
+  accountSubmitBtn: { width: '100%', minHeight: 50, padding: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  accountSwitch: { textAlign: 'center', marginTop: 16, fontSize: 14, fontWeight: '600' },
 });
