@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/expense-tracker.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon-2.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#6C63FF"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -38,9 +33,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#6C63FF",
-          "image": "./assets/splash-icon-2.png",
-          "imageWidth": 220,
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/expense-tracker.png",
+          "imageWidth": 200,
           "resizeMode": "contain"
         }
       ],
@@ -53,7 +48,6 @@
       "expo-sharing"
     ],
     "extra": {
-      "apiUrl": "http://192.168.0.113:3000",
       "eas": {
         "projectId": "9c4e6c7b-f188-4bb3-96ae-8adfd93f701d"
       }

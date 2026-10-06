@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, ActivityIndicator, View } from 'react-native';
+import { StatusBar, ActivityIndicator, Image, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -121,7 +121,8 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 24, backgroundColor: colors.background }}>
+        <Image source={require('./assets/expense-tracker.png')} style={{ width: 200, height: 200 }} resizeMode="contain" />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );

@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Expense, Category, Budget } from '../types';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl as string | undefined;
+const API_URL = (Constants.expoConfig?.extra?.apiUrl as string | undefined)?.replace(/\/+$/, '');
 const TOKEN_KEY = 'expense_tracker_session';
 
 export interface Account {
@@ -27,7 +27,12 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
       ...options.headers,
     },
   });
-  const body = await response.json();
+  let body: { message?: string } & T;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error('The cloud server returned an invalid response. Check the API URL and server deployment.');
+  }
   if (!response.ok) throw new Error(body.message || 'Cloud request failed');
   return body as T;
 };

@@ -36,6 +36,14 @@ export const AddExpenseScreen: React.FC<{ navigation: any; route: any }> = ({ na
     }
   }, []);
 
+  useEffect(() => {
+    setAmount(editExpense?.amount.toString() || '');
+    setSelectedCategory(editExpense ? categories.find(c => c.name === editExpense.category) || null : null);
+    setDate(editExpense ? new Date(editExpense.date) : new Date());
+    setNote(editExpense?.note || '');
+    setShowCategories(false);
+  }, [editExpense?.id, editExpense?.amount, editExpense?.category, editExpense?.date, editExpense?.note, categories]);
+
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
@@ -232,7 +240,7 @@ export const AddExpenseScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 140 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
   backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontSize: 22, fontWeight: '700', marginLeft: 12 },
