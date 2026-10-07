@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight, Layout } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -8,10 +9,10 @@ import { useExpenses } from '../context/ExpenseContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { ExpenseItem } from '../components/ExpenseItem';
 import { EmptyState } from '../components/EmptyState';
-import { formatCurrency, groupByDate, formatDate } from '../utils/helpers';
+import { formatCurrency, groupByDate, formatDate, getMonthKey, getMonthName } from '../utils/helpers';
 import { Expense } from '../types';
 
-export const TransactionsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const TransactionsScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { expenses, categories, deleteExpense } = useExpenses();
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,9 +20,16 @@ export const TransactionsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [showFilters, setShowFilters] = useState(false);
   const { currency } = useCurrency();
   const currencySymbol = currency.symbol;
+  const selectedMonthKey = route.params?.monthKey || getMonthKey(new Date());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => navigation.setParams({ monthKey: undefined });
+    }, [navigation])
+  );
 
   const filteredExpenses = useMemo(() => {
-    let filtered = expenses;
+    let filtered = expenses.filter(e => getMonthKey(new Date(e.date)) === selectedMonthKey);
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -37,8 +45,8 @@ export const TransactionsScreen: React.FC<{ navigation: any }> = ({ navigation }
       filtered = filtered.filter(e => e.category === selectedFilter);
     }
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, searchQuery, selectedFilter]);
+    return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [expenses, searchQuery, selectedFilter, selectedMonthKey]);
 
   const groupedExpenses = useMemo(() => {
     const groups = groupByDate(filteredExpenses);
@@ -76,7 +84,7 @@ export const TransactionsScreen: React.FC<{ navigation: any }> = ({ navigation }
       <Animated.View entering={FadeInDown.springify()} style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Transactions</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {filteredExpenses.length} transaction{filteredExpenses.length !== 1 ? 's' : ''}
+          {getMonthName(new Date(`${selectedMonthKey}-01T00:00:00`))} · {filteredExpenses.length} transaction{filteredExpenses.length !== 1 ? 's' : ''}
         </Text>
       </Animated.View>
 

@@ -7,11 +7,11 @@ import { useTheme } from '../context/ThemeContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { AnimatedCard } from '../components/AnimatedCard';
-import { formatCurrency, getMonthName } from '../utils/helpers';
+import { formatCurrency, getMonthKey, getMonthName } from '../utils/helpers';
 
 const { width } = Dimensions.get('window');
 
-export const ReportsScreen: React.FC = () => {
+export const ReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
   const { getCategoryTotals, getMonthExpenses, expenses } = useExpenses();
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
@@ -23,11 +23,11 @@ export const ReportsScreen: React.FC = () => {
   const totalSpent = categoryTotals.reduce((sum, c) => sum + c.total, 0);
 
   const monthlyHistory = useMemo(() => {
-    const months: { [key: string]: { label: string; total: number; count: number } } = {};
+    const months: { [key: string]: { key: string; label: string; total: number; count: number } } = {};
     expenses.forEach(expense => {
       const date = new Date(expense.date);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!months[key]) months[key] = { label: getMonthName(date), total: 0, count: 0 };
+      const key = getMonthKey(date);
+      if (!months[key]) months[key] = { key, label: getMonthName(date), total: 0, count: 0 };
       months[key].total += expense.amount;
       months[key].count += 1;
     });
@@ -238,13 +238,20 @@ export const ReportsScreen: React.FC = () => {
           {monthlyHistory.length === 0 ? (
             <Text style={[styles.emptyHistory, { color: colors.textTertiary }]}>No monthly history yet</Text>
           ) : monthlyHistory.map(month => (
-            <View key={month.label} style={[styles.historyRow, { borderBottomColor: colors.border }]}>
+            <Pressable
+              key={month.key}
+              style={[styles.historyRow, { borderBottomColor: colors.border }]}
+              onPress={() => navigation.navigate('Transactions', { monthKey: month.key })}
+            >
               <View style={styles.historyInfo}>
                 <Text style={[styles.historyMonth, { color: colors.text }]}>{month.label}</Text>
                 <Text style={[styles.historyCount, { color: colors.textTertiary }]}>{month.count} transaction{month.count !== 1 ? 's' : ''}</Text>
               </View>
-              <Text style={[styles.historyTotal, { color: colors.text }]}>{formatCurrency(month.total, currencySymbol)}</Text>
-            </View>
+              <View style={styles.historyTotalContainer}>
+                <Text style={[styles.historyTotal, { color: colors.text }]}>{formatCurrency(month.total, currencySymbol)}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
           ))}
         </AnimatedCard>
 
@@ -301,5 +308,6 @@ const styles = StyleSheet.create({
   historyMonth: { fontSize: 15, fontWeight: '600' },
   historyCount: { fontSize: 12, marginTop: 3 },
   historyTotal: { fontSize: 15, fontWeight: '700' },
+  historyTotalContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   emptyHistory: { paddingVertical: 16, textAlign: 'center' },
 });

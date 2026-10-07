@@ -46,6 +46,10 @@ export const getMonthName = (date: Date): string => {
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
 
+export const getMonthKey = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export const getDaysInMonth = (): number => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();

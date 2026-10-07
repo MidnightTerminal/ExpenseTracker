@@ -17,7 +17,7 @@ interface SyncPayload {
 }
 
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
-  if (!API_URL) throw new Error('Cloud sync is not configured. Add apiUrl to app.json extra.');
+  if (!API_URL) throw new Error('Cloud sync is not configured. Set EXPO_PUBLIC_API_URL in your Expo environment.');
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
   const response = await fetch(`${API_URL}${path}`, {
     ...options,

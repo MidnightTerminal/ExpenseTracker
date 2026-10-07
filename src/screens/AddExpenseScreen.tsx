@@ -67,11 +67,22 @@ export const AddExpenseScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
     if (editExpense) {
       await updateExpense(editExpense.id, expenseData);
+      navigation.goBack();
     } else {
       await addExpense(expenseData);
-    }
+      setAmount('');
+      setSelectedCategory(null);
+      setDate(new Date());
+      setNote('');
+      setShowCategories(false);
 
-    navigation.goBack();
+      const navigationState = navigation.getState?.();
+      if (navigationState?.type === 'tab') {
+        navigation.navigate('Dashboard');
+      } else {
+        navigation.navigate('Tabs', { screen: 'Dashboard' });
+      }
+    }
   };
 
   const handleDelete = () => {

@@ -63,7 +63,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   useEffect(() => {
-    if (account) syncFromCloud();
+    if (account && cloudApi.isConfigured) syncFromCloud();
   }, [account]);
 
   const loadData = async () => {
@@ -105,7 +105,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const syncNow = async () => {
-    if (!account) return;
+    if (!account || !cloudApi.isConfigured) return;
     await cloudApi.saveSync({ expenses, categories, budget });
   };
 
@@ -118,21 +118,21 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
   };
 
   const updateExpense = async (id: string, data: Partial<Expense>) => {
     const updated = expenses.map(e => e.id === id ? { ...e, ...data } : e);
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
   };
 
   const deleteExpense = async (id: string) => {
     const updated = expenses.filter(e => e.id !== id);
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
   };
 
   const addCategory = async (category: Omit<Category, 'id'>) => {
@@ -140,27 +140,27 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = [...categories, newCat];
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
   };
 
   const updateCategory = async (id: string, data: Partial<Category>) => {
     const updated = categories.map(c => c.id === id ? { ...c, ...data } : c);
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
   };
 
   const deleteCategory = async (id: string) => {
     const updated = categories.filter(c => c.id !== id);
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
   };
 
   const setBudget = async (newBudget: Budget) => {
     setBudgetState(newBudget);
     await storage.save(storage.keys.BUDGET, newBudget);
-    if (account) await cloudApi.saveSync({ expenses, categories, budget: newBudget });
+    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories, budget: newBudget });
   };
 
   const getTodayTotal = useCallback(() => {
