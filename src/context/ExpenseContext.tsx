@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
 import { Expense, Category, Budget } from '../types';
 import { storage } from '../utils/storage';
 import { DEFAULT_CATEGORIES } from '../utils/constants';
@@ -23,6 +24,9 @@ interface ExpenseContextType {
   getMonthExpenses: () => Expense[];
   getCategoryTotals: (period?: 'day' | 'week' | 'month') => { name: string; total: number; color: string; icon: string; percentage: number }[];
   syncNow: () => Promise<void>;
+  backupTime: string;
+  setBackupTime: (time: string) => Promise<void>;
+  lastBackupAt: string | null;
   loading: boolean;
 }
 
@@ -55,16 +59,19 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [budget, setBudgetState] = useState<Budget>({ monthlyLimit: 0, categoryLimits: {} });
+  const [backupTime, setBackupTimeState] = useState('23:00');
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { account } = useAuth();
+  const backupInProgress = useRef(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    if (account && cloudApi.isConfigured) syncFromCloud();
-  }, [account]);
+    if (!loading && account && cloudApi.isConfigured) syncFromCloud();
+  }, [account, loading]);
 
   const loadData = async () => {
     try {
@@ -77,6 +84,13 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (Array.isArray(savedExpenses)) setExpenses(savedExpenses);
       if (Array.isArray(savedCategories)) setCategories(savedCategories);
       if (savedBudget && typeof savedBudget === 'object') setBudgetState(savedBudget);
+      const savedBackupTime = await storage.load(storage.keys.BACKUP_TIME);
+      const savedLastBackup = await storage.load(storage.keys.LAST_BACKUP_AT);
+      if (typeof savedBackupTime === 'string' && /^\d{2}:\d{2}$/.test(savedBackupTime)) setBackupTimeState(savedBackupTime);
+      if (typeof savedLastBackup === 'string') setLastBackupAt(savedLastBackup);
+      if (!savedLastBackup && (Array.isArray(savedExpenses) || Array.isArray(savedCategories) || savedBudget)) {
+        await storage.save(storage.keys.BACKUP_PENDING, true);
+      }
     } catch (error) {
       console.error('Load data error:', error);
     } finally {
@@ -87,8 +101,8 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const syncFromCloud = async () => {
     try {
       const remote = await cloudApi.getSync();
-      if (Array.isArray(remote.expenses) && remote.expenses.length === 0 && expenses.length > 0) {
-        await cloudApi.saveSync({ expenses, categories, budget });
+      const hasPendingChanges = await storage.load(storage.keys.BACKUP_PENDING);
+      if (hasPendingChanges) {
         return;
       }
       if (Array.isArray(remote.expenses)) setExpenses(remote.expenses);
@@ -107,6 +121,61 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const syncNow = async () => {
     if (!account || !cloudApi.isConfigured) return;
     await cloudApi.saveSync({ expenses, categories, budget });
+    const backedUpAt = new Date().toISOString();
+    setLastBackupAt(backedUpAt);
+    await Promise.all([
+      storage.save(storage.keys.LAST_BACKUP_AT, backedUpAt),
+      storage.save(storage.keys.BACKUP_PENDING, false),
+    ]);
+  };
+
+  const markBackupPending = async () => {
+    await storage.save(storage.keys.BACKUP_PENDING, true);
+  };
+
+  const runScheduledBackup = useCallback(async () => {
+    if (!account || !cloudApi.isConfigured || backupInProgress.current) return;
+    const pending = await storage.load(storage.keys.BACKUP_PENDING);
+    if (!pending) return;
+
+    const now = new Date();
+    const [hours, minutes] = backupTime.split(':').map(Number);
+    const scheduledAt = new Date(now);
+    scheduledAt.setHours(hours, minutes, 0, 0);
+    const lastBackupDate = lastBackupAt ? new Date(lastBackupAt).toDateString() : null;
+    if (now < scheduledAt || lastBackupDate === now.toDateString()) return;
+
+    backupInProgress.current = true;
+    try {
+      await cloudApi.saveSync({ expenses, categories, budget });
+      const backedUpAt = now.toISOString();
+      setLastBackupAt(backedUpAt);
+      await Promise.all([
+        storage.save(storage.keys.LAST_BACKUP_AT, backedUpAt),
+        storage.save(storage.keys.BACKUP_PENDING, false),
+      ]);
+    } catch (error) {
+      console.warn('Scheduled cloud backup skipped:', error);
+    } finally {
+      backupInProgress.current = false;
+    }
+  }, [account, backupTime, budget, categories, expenses, lastBackupAt]);
+
+  useEffect(() => {
+    const interval = setInterval(() => { void runScheduledBackup(); }, 60 * 1000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void runScheduledBackup();
+    });
+    void runScheduledBackup();
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [runScheduledBackup]);
+
+  const setBackupTime = async (time: string) => {
+    setBackupTimeState(time);
+    await storage.save(storage.keys.BACKUP_TIME, time);
   };
 
   const addExpense = async (expense: Omit<Expense, 'id' | 'createdAt'>) => {
@@ -118,21 +187,21 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    await markBackupPending();
   };
 
   const updateExpense = async (id: string, data: Partial<Expense>) => {
     const updated = expenses.map(e => e.id === id ? { ...e, ...data } : e);
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    await markBackupPending();
   };
 
   const deleteExpense = async (id: string) => {
     const updated = expenses.filter(e => e.id !== id);
     setExpenses(updated);
     await storage.save(storage.keys.EXPENSES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses: updated, categories, budget });
+    await markBackupPending();
   };
 
   const addCategory = async (category: Omit<Category, 'id'>) => {
@@ -140,27 +209,27 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = [...categories, newCat];
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    await markBackupPending();
   };
 
   const updateCategory = async (id: string, data: Partial<Category>) => {
     const updated = categories.map(c => c.id === id ? { ...c, ...data } : c);
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    await markBackupPending();
   };
 
   const deleteCategory = async (id: string) => {
     const updated = categories.filter(c => c.id !== id);
     setCategories(updated);
     await storage.save(storage.keys.CATEGORIES, updated);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories: updated, budget });
+    await markBackupPending();
   };
 
   const setBudget = async (newBudget: Budget) => {
     setBudgetState(newBudget);
     await storage.save(storage.keys.BUDGET, newBudget);
-    if (account && cloudApi.isConfigured) await cloudApi.saveSync({ expenses, categories, budget: newBudget });
+    await markBackupPending();
   };
 
   const getTodayTotal = useCallback(() => {
@@ -214,7 +283,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addCategory, updateCategory, deleteCategory,
         setBudget, getTodayTotal, getWeekTotal, getMonthTotal,
         getMonthExpenses, getCategoryTotals,
-        syncNow,
+        syncNow, backupTime, setBackupTime, lastBackupAt,
       }}
     >
       {children}

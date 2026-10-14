@@ -115,34 +115,33 @@ export const TransactionsScreen: React.FC<{ navigation: any; route: any }> = ({ 
 
       {/* Filters */}
       {showFilters && (
-        <Animated.ScrollView
+        <Animated.View
           entering={FadeInDown.springify()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
           style={styles.filtersRow}
-          contentContainerStyle={styles.filtersContent}
         >
-          <Pressable
-            style={[styles.filterChip, { backgroundColor: !selectedFilter ? colors.primary : colors.surfaceVariant }]}
-            onPress={() => setSelectedFilter(null)}
-          >
-            <Text style={[styles.filterChipText, { color: !selectedFilter ? '#FFF' : colors.text }]}>All</Text>
-          </Pressable>
-          {uniqueCategories.map(cat => (
+          <View style={styles.filtersContent}>
             <Pressable
-              key={cat}
-              style={[
-                styles.filterChip,
-                { backgroundColor: selectedFilter === cat ? colors.primary : colors.surfaceVariant },
-              ]}
-              onPress={() => setSelectedFilter(selectedFilter === cat ? null : cat)}
+              style={[styles.filterChip, { backgroundColor: !selectedFilter ? colors.primary : colors.surfaceVariant }]}
+              onPress={() => setSelectedFilter(null)}
             >
-              <Text style={[styles.filterChipText, { color: selectedFilter === cat ? '#FFF' : colors.text }]}>
-                {cat}
-              </Text>
+              <Text style={[styles.filterChipText, { color: !selectedFilter ? '#FFF' : colors.text }]}>All</Text>
             </Pressable>
-          ))}
-        </Animated.ScrollView>
+            {uniqueCategories.map(cat => (
+              <Pressable
+                key={cat}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: selectedFilter === cat ? colors.primary : colors.surfaceVariant },
+                ]}
+                onPress={() => setSelectedFilter(selectedFilter === cat ? null : cat)}
+              >
+                <Text style={[styles.filterChipText, { color: selectedFilter === cat ? '#FFF' : colors.text }]}>
+                  {cat}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Animated.View>
       )}
 
       {/* Transaction List */}
@@ -197,8 +196,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 15 },
   filterBtn: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  filtersRow: { maxHeight: 44, marginBottom: 8 },
-  filtersContent: { paddingHorizontal: 20, gap: 8 },
+  filtersRow: { marginBottom: 8 },
+  filtersContent: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 8 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   filterChipText: { fontSize: 13, fontWeight: '600' },
   listContent: { paddingHorizontal: 20, paddingBottom: 100 },

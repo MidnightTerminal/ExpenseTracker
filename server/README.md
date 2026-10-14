@@ -49,4 +49,6 @@ User {
 
 After registration or sign-in, the API returns a JWT. The app stores that token in Android Secure Store and sends it as a Bearer token. The server reads the token's user id and only reads or updates that user's `data` object through `/sync`, so accounts do not share expense records. AsyncStorage also keeps a device-local cache; it is not the source of truth for cloud backup.
 
+The app stores the working copy in AsyncStorage. Changes are marked pending locally and uploaded during the configured nightly backup window when the app is running or returns to the foreground; the API does not receive every transaction immediately.
+
 Do not put `MONGODB_URI`, the database password, or `JWT_SECRET` in `app.json` or the mobile app.

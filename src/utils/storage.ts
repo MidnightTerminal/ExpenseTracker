@@ -7,6 +7,9 @@ const KEYS = {
   SETTINGS: '@settings',
   PIN: '@pin_hash',
   ACCOUNT: '@account',
+  BACKUP_PENDING: '@backup_pending',
+  LAST_BACKUP_AT: '@last_backup_at',
+  BACKUP_TIME: '@backup_time',
 };
 
 export const storage = {

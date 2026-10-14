@@ -15,6 +15,7 @@ import { CURRENCY_OPTIONS } from '../utils/constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { formatCurrency } from '../utils/helpers';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -22,7 +23,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     isLockEnabled, enableLock, isPinSet, setPin, isBiometricAvailable, logout,
     account, cloudConfigured, register, login, cloudLogout,
   } = useAuth();
-  const { expenses } = useExpenses();
+  const { expenses, backupTime, setBackupTime, lastBackupAt } = useExpenses();
   const { currency: selectedCurrency, setCurrency } = useCurrency();
   const [showPinModal, setShowPinModal] = useState(false);
   const [newPin, setNewPin] = useState('');
@@ -32,6 +33,17 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [accountBusy, setAccountBusy] = useState(false);
+  const [showBackupTimePicker, setShowBackupTimePicker] = useState(false);
+
+  const backupTimeDate = (() => {
+    const [hours, minutes] = backupTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  })();
+
+  const formatBackupTime = (date: Date) =>
+    `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 
   const handleToggleLock = async (enabled: boolean) => {
     if (enabled && !isPinSet) {
@@ -232,6 +244,13 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           ) : account ? (
             <>
               <SettingRow icon="cloud-done" iconColor={colors.success} title="Signed in" subtitle={account.email} onPress={() => navigation.navigate('Profile')} />
+              <SettingRow
+                icon="time"
+                iconColor={colors.primary}
+                title="Nightly backup time"
+                subtitle={`${backupTime} local time${lastBackupAt ? ` · Last backup ${new Date(lastBackupAt).toLocaleDateString()}` : ''}`}
+                onPress={() => setShowBackupTimePicker(true)}
+              />
               <SettingRow icon="log-out-outline" iconColor={colors.error} title="Sign out" onPress={() => cloudLogout()} />
             </>
           ) : (
@@ -355,6 +374,17 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </Animated.View>
         </View>
       </Modal>
+
+      <DateTimePickerModal
+        isVisible={showBackupTimePicker}
+        mode="time"
+        date={backupTimeDate}
+        onConfirm={async date => {
+          await setBackupTime(formatBackupTime(date));
+          setShowBackupTimePicker(false);
+        }}
+        onCancel={() => setShowBackupTimePicker(false)}
+      />
 
       <Modal visible={showAccountModal} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
